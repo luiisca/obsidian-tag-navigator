@@ -1,5 +1,6 @@
 node_modules/
 dist/
 main.js
+data.json
 .vscode/
 *.code-workspace

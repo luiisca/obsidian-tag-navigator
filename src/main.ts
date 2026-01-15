@@ -41,7 +41,7 @@ export default class CrossNavPlugin extends Plugin {
         leaf.setViewState({
           type: VIEW_TYPE,
         });
-        this.app.workspace.setActiveLeaf(leaf, { focus: true });
+        this.app.workspace.setActiveLeaf(leaf, true, true);
       },
     })
   }
