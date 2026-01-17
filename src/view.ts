@@ -3,9 +3,10 @@ import type { SettingsStore, TagMenuStore } from "./ui/stores"
 import { VIEW_TYPE } from "src/constants"
 import TagMenu from "./ui/TagMenu.svelte"
 import { get } from "svelte/store"
+import { mount, unmount } from "svelte"
 
 export default class CRNView extends ItemView {
-  private tagMenu: TagMenu
+  private tagMenu: Record<string, unknown>
   private settingsStore: SettingsStore
   private tagMenuStore: TagMenuStore
   private unsubscribe: () => void
@@ -45,7 +46,7 @@ export default class CRNView extends ItemView {
 
   onClose(): Promise<void> {
     if (this.tagMenu) {
-      this.tagMenu.$destroy();
+      unmount(this.tagMenu)
     }
 
     if (this.unsubscribe) {
@@ -56,7 +57,7 @@ export default class CRNView extends ItemView {
   }
 
   onOpen(): Promise<void> {
-    this.tagMenu = new TagMenu({
+    this.tagMenu = mount(TagMenu, {
       target: this.contentEl,
       props: {
         settingsStore: this.settingsStore,

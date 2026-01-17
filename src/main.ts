@@ -27,10 +27,11 @@ export default class CrossNavPlugin extends Plugin {
 
   async onload(): Promise<void> {
     this.settingsStore = await createSettingsStore(this)
+    this.tagMenuStore = createTagMenuStore(this.settingsStore)
 
     this.registerView(
       VIEW_TYPE,
-      (leaf: WorkspaceLeaf) => (this.view = new CRNView(leaf, this.settingsStore, createTagMenuStore(this.settingsStore)))
+      (leaf: WorkspaceLeaf) => (this.view = new CRNView(leaf, this.settingsStore, this.tagMenuStore))
     )
 
     this.addCommand({

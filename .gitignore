@@ -1,6 +1,8 @@
 node_modules/
 dist/
 main.js
+main.js.map
+styles.css
 data.json
 .vscode/
 *.code-workspace
