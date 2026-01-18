@@ -4,5 +4,6 @@ main.js
 main.js.map
 styles.css
 data.json
+.gemini/
 .vscode/
 *.code-workspace
