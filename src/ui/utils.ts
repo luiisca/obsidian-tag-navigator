@@ -1,4 +1,3 @@
-
 export function tagParts(tag: string): { tag: string, label?: string, title: string } {
   let temp = tag.slice()
 
