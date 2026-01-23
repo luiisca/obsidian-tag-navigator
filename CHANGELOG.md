@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/luiisca/obsidian-tag-navigator/compare/v0.5.1...v0.6.0) (2026-01-23)
+
+
+### Features
+
+* add Workflows to save and restore tag contexts (fixes [#15](https://github.com/luiisca/obsidian-tag-navigator/issues/15)) ([0ea856f](https://github.com/luiisca/obsidian-tag-navigator/commit/0ea856fe8b05247421c89dadee21a53f20a723e4))
+
 ## [0.5.1](https://github.com/luiisca/obsidian-tag-navigator/compare/v0.5.0...v0.5.1) (2026-01-15)
 
 
