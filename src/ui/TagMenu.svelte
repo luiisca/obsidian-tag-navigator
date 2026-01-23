@@ -1,15 +1,22 @@
 <script lang="ts">
   import { TFile, Keymap } from "obsidian";
-  import { onMount } from "svelte";
-  import type { SettingsStore, TagMenuStore } from "./stores";
-  import TagTitle from "./TagTitle.svelte";
-  import Star from "./Star.svelte";
+  import { onDestroy, onMount } from "svelte";
+  import type { SettingsStore, TagMenuStore, WorkflowEntry } from "./stores";
+  import { Star, TagTitle } from "src/ui/components";
+  import { WorkflowSuggest } from "src/ui/suggest";
+  import { openEditWorkflowModal } from "src/ui/modals/workflow";
+  import { useIcon } from "src/ui/utils";
 
   interface Props {
     settingsStore: SettingsStore;
     viewStore: TagMenuStore;
   }
   const { settingsStore, viewStore }: Props = $props();
+
+  let addWBttnEl: HTMLButtonElement;
+  let selectWBttnEl: HTMLButtonElement;
+  let selectWIconEl: HTMLDivElement;
+  let workflowSuggestInstance: WorkflowSuggest;
 
   const columnWidth = 250;
   const columnMargin = 20;
@@ -19,6 +26,11 @@
     Math.max(1, Math.trunc(clientWidth / totalColumnWidth)),
   );
   let contentWidth = $derived(columns * totalColumnWidth);
+  let selectedW = $derived(
+    $settingsStore.workflows.list.find(
+      (w) => w?.id === $viewStore.workflows.selected,
+    ),
+  );
 
   async function openFile(e: MouseEvent, file: TFile) {
     let inNewSplit = Keymap.isModEvent(e);
@@ -28,43 +40,126 @@
     await leaf.openFile(file, { active: true });
   }
 
+  // workflows
+  const selectWorkflow = (id: string) => {
+    settingsStore.selectWorkflow(id);
+    viewStore.selectWorkflow(id);
+  };
+
+  const handleSelectWorkflow = (w: WorkflowEntry) => {
+    selectWorkflow(w.id);
+    viewStore.selectTags(w.tags);
+  };
+
+  const handleSelectTags = (tags: string[]) => {
+    viewStore.selectTags(tags);
+
+    if (!tags.length) {
+      selectWorkflow("");
+    } else {
+      const w = $settingsStore.workflows.list.find(
+        (w) => JSON.stringify(w?.tags) === JSON.stringify(tags),
+      );
+      selectWorkflow(w?.id ?? "");
+    }
+  };
+
+  $effect(() => {
+    if ($settingsStore.workflows.enabled && !workflowSuggestInstance) {
+      workflowSuggestInstance = new WorkflowSuggest(
+        selectWBttnEl,
+        settingsStore,
+        handleSelectWorkflow,
+      );
+    }
+  });
+
   onMount(() => {
     // Ensures we've loaded everything when presented
-    viewStore.selectTags($viewStore.selectedTags);
+    viewStore.selectTags(selectedW?.tags || $viewStore.selectedTags);
+  });
+
+  onDestroy(() => {
+    workflowSuggestInstance.destroy();
   });
 </script>
 
 <div bind:clientWidth class="tag-menu-container">
   <div style={"width: " + contentWidth + "px; margin: 0 auto;"}>
-    <div class="path">
-      <button class="link" onclick={(_) => viewStore.selectTags([])}>
-        <TagTitle tag="All Tags" />
-      </button>
-
-      {#each $viewStore.selectedTags as tag, index}
-        <div>›</div>
-        <button
-          class="link"
-          onclick={(e) =>
-            Keymap.isModEvent(e) === "tab"
-              ? viewStore.selectTags([tag])
-              : viewStore.selectTags(
-                  $viewStore.selectedTags.slice(0, index + 1),
-                )}
-        >
-          <TagTitle {tag} />
+    <div class="flex-column" style="row-gap: 16px;">
+      <div class="path">
+        <button class="link" onclick={(_) => handleSelectTags([])}>
+          <TagTitle tag="All Tags" />
         </button>
-      {/each}
 
-      <p class="muted small" style="margin-left: 10px; align-self: flex-end;">
-        {$viewStore.allMatchingFiles.length} notes
-      </p>
+        {#each $viewStore.selectedTags as tag, index}
+          <div>›</div>
+          <button
+            class="link"
+            onclick={(e) =>
+              Keymap.isModEvent(e) === "tab"
+                ? handleSelectTags([tag])
+                : handleSelectTags($viewStore.selectedTags.slice(0, index + 1))}
+          >
+            <TagTitle {tag} />
+          </button>
+        {/each}
 
-      <div style="visibility: hidden;"><TagTitle tag="A/A" /></div>
-      <!-- To keep height constant -->
+        {#if !$settingsStore.workflows.enabled}
+          <p
+            class="muted small"
+            style="margin-left: 10px; align-self: flex-end;"
+          >
+            {$viewStore.allMatchingFiles.length} notes
+          </p>
+        {/if}
+
+        <div style="visibility: hidden;"><TagTitle tag="A/A" /></div>
+        <!-- To keep height constant -->
+      </div>
+
+      {#if $settingsStore.workflows.enabled}
+        <div class="flex align-bottom" style="padding: 0px 5px;">
+          <p class="muted small">
+            {$viewStore.allMatchingFiles.length} notes
+          </p>
+          <div
+            class="flex align-bottom"
+            style="margin-left: auto; gap:var(--size-4-1)"
+          >
+            <button bind:this={selectWBttnEl} class="workflow-select-container">
+              <div
+                use:useIcon={"chevrons-up-down"}
+                class="workflow-select-icon"
+                bind:this={selectWIconEl}
+              ></div>
+              <span
+                class={selectedW?.name ? "workflow-select-list" : "muted"}
+                style="line-height: var(--line-height-tight);"
+              >
+                {selectedW?.name || "Workflows"}
+              </span>
+            </button>
+            <button
+              class="workflow-add-btn clickable-icon"
+              use:useIcon={"circle-plus"}
+              bind:this={addWBttnEl}
+              aria-label="Save workflow"
+              onclick={() =>
+                openEditWorkflowModal({
+                  settingsStore,
+                  type: "add",
+                  selectedTags: $viewStore.selectedTags,
+                  cb: (w: WorkflowEntry) => handleSelectWorkflow(w),
+                })}
+            >
+            </button>
+          </div>
+        </div>
+      {/if}
     </div>
 
-    <hr />
+    <hr style={$settingsStore.workflows.enabled ? "margin-top: 16px" : ""} />
 
     <div>
       <div class="flex align-center flex-wrap vscroll">
@@ -149,7 +244,7 @@
                 class="flex align-bottom link"
                 style="width: 100%;"
                 onclick={(_) =>
-                  viewStore.selectTags([...$viewStore.selectedTags, tag])}
+                  handleSelectTags([...$viewStore.selectedTags, tag])}
               >
                 <TagTitle {tag} inline={false} strong={true} />
                 <div class="flex-spacer"></div>
@@ -166,7 +261,7 @@
                         class="intersection flex link"
                         style="width: 100%;"
                         onclick={(_) =>
-                          viewStore.selectTags([
+                          handleSelectTags([
                             ...$viewStore.selectedTags,
                             tag,
                             tag2,
@@ -251,7 +346,7 @@
     display: block;
     text-align: justify;
     background-color: transparent;
-    cursor: pointer;
+    cursor: var(--cursor);
   }
 
   :where(.tag-menu-container) button:not(:focus-visible) {
@@ -264,6 +359,8 @@
 
   .path {
     display: flex;
+    flex-wrap: wrap;
+    row-gap: 6px;
     align-items: flex-end;
   }
 
@@ -291,6 +388,10 @@
   .flex {
     display: flex;
     justify-content: flex-start;
+  }
+  .flex-column {
+    display: flex;
+    flex-direction: column;
   }
 
   .align-bottom {
@@ -330,7 +431,7 @@
   }
 
   .mutedLink {
-    cursor: pointer;
+    cursor: var(--cursor);
     opacity: 0.5;
     transition: all 0.2 ease;
   }
@@ -340,7 +441,7 @@
   }
 
   .link {
-    cursor: pointer;
+    cursor: var(--cursor);
 
     background: transparent;
     border-radius: 3px;
@@ -385,7 +486,7 @@
   }
 
   .btn {
-    cursor: pointer;
+    cursor: var(--cursor);
     padding: 4px 10px;
     border-radius: 100px;
     border: 1px solid var(--interactive-accent);
@@ -450,5 +551,41 @@
     pointer-events: all;
     left: 0px;
     margin-right: 0;
+  }
+
+  .workflow-select-container {
+    color: var(--text-color);
+    border-radius: var(--radius-s);
+    display: flex;
+    flex-grow: 1;
+    align-items: center;
+    gap: var(--size-4-2);
+    overflow: hidden;
+    padding: var(--size-4-1) var(--size-4-2);
+    -electron-corner-smoothing: var(--corner-smoothing);
+  }
+  .workflow-select-container:hover {
+    background-color: var(--background-modifier-hover);
+  }
+  .workflow-select-list {
+    font-size: var(--font-ui-small);
+    font-weight: var(--input-font-weight);
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .workflow-select-icon {
+    --icon-size: var(--icon-s);
+    --icon-stroke: var(--icon-s-stroke-width);
+    display: flex;
+    align-items: center;
+    color: var(--text-faint);
+  }
+  .workflow-select-container:hover .workflow-select-icon {
+    color: var(--text-muted);
+  }
+  .workflow-add-btn {
+    line-height: 0;
+    padding: var(--size-2-2) var(--size-2-3);
   }
 </style>

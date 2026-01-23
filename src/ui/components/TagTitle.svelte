@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tagParts } from "./utils";
+  import { tagParts } from "src/ui/utils";
 
   export let tag: string;
   export let inline: boolean = false;
