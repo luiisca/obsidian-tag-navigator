@@ -273,7 +273,7 @@ export class TagSuggest extends BaseSuggest<string, HTMLInputElement> {
   }
 }
 
-export class WorkflowSuggest extends BaseSuggest<WorkflowEntry | null, HTMLButtonElement> {
+export class WorkflowSuggest extends BaseSuggest<WorkflowEntry, HTMLButtonElement> {
   private settingsStore: SettingsStore
   private onSelect: (w: WorkflowEntry) => void;
   public notFoundMsg = 'No saved workflows';
@@ -285,8 +285,8 @@ export class WorkflowSuggest extends BaseSuggest<WorkflowEntry | null, HTMLButto
     this.renderSeparator = true
   }
 
-  getSuggestions(): (WorkflowEntry | null)[] {
-    return get(this.settingsStore).workflows.list
+  getSuggestions(): WorkflowEntry[] {
+    return get(this.settingsStore).workflows.list.filter(Boolean) as WorkflowEntry[]
   }
 
   /**
