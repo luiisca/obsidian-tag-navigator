@@ -4,18 +4,35 @@ import { tagParts } from "./utils";
 
 import type { Readable } from "svelte/store";
 
+export interface WorkflowEntry {
+  id: string;
+  name: string;
+  tags: string[];
+}
 export interface StoredSettings {
   excludedGroups: string[],
   excludedTags: string[],
   favoriteGroups: string[],
-  favoriteTags: string[]
+  favoriteTags: string[],
+  workflows: {
+    enabled: boolean,
+    list: (WorkflowEntry | null)[],
+    trash: (WorkflowEntry | null)[],
+    selected: string,
+  }
 }
 
 export const defaultSettings: StoredSettings = {
   excludedGroups: [],
   excludedTags: [],
   favoriteGroups: ["status", "activity", "type"],
-  favoriteTags: []
+  favoriteTags: [],
+  workflows: {
+    enabled: true,
+    list: [],
+    trash: [],
+    selected: ""
+  },
 }
 
 export interface SettingsStore extends Readable<StoredSettings> {
@@ -23,6 +40,12 @@ export interface SettingsStore extends Readable<StoredSettings> {
   toggleExcludedTag(tag: string): void
   toggleFavoriteGroup(group: string): void
   toggleFavoriteTag(tag: string): void
+  toggleWorkflows(v: boolean): void
+  selectWorkflow(key: string): void
+  addWorkflow(workflow: { name: string, tags: string[] }): WorkflowEntry | null
+  editWorkflow(name: string, tags: string[], i?: number): void
+  removeWorkflow(i: number, trashed: boolean): void
+  restoreWorkflow(i: number): void
 }
 
 export async function createSettingsStore(
@@ -49,7 +72,6 @@ export async function createSettingsStore(
         excludedGroups
       }
 
-      plugin.saveData(newState)
       return newState
     })
   }
@@ -72,7 +94,6 @@ export async function createSettingsStore(
         excludedTags
       }
 
-      plugin.saveData(newState)
       return newState
     })
   }
@@ -95,7 +116,6 @@ export async function createSettingsStore(
         favoriteGroups
       }
 
-      plugin.saveData(newState)
       return newState
     })
   }
@@ -118,9 +138,115 @@ export async function createSettingsStore(
         favoriteTags
       }
 
-      plugin.saveData(newState)
       return newState
     })
+  }
+
+  // workflows
+  function toggleWorkflows(v: boolean) {
+    update((s) => ({
+      ...s,
+      workflows: {
+        ...s.workflows,
+        enabled: v,
+      },
+    }));
+  }
+
+  function selectWorkflow(key: string) {
+    update(settings => {
+      const newState: StoredSettings = {
+        ...settings,
+        workflows: {
+          ...settings.workflows,
+          selected: key
+        }
+      }
+
+      return newState
+    })
+  }
+
+  function addWorkflow(w: { name: string; tags: string[] }) {
+    let workflow: WorkflowEntry | null = null;
+
+    update((settings) => {
+      const workflows = settings.workflows;
+
+      const found = workflows.list.find(
+        (item) => item?.name === w.name && item.tags.join(",") === w.tags.join(",")
+      );
+
+      if (found) {
+        workflow = found
+        return settings;
+      }
+
+      const newEntry: WorkflowEntry = {
+        id: crypto.randomUUID(),
+        name: w.name,
+        tags: w.tags,
+      };
+      workflow = newEntry
+
+      return {
+        ...settings,
+        workflows: {
+          ...workflows,
+          list: [...workflows.list, newEntry],
+        },
+      };
+    });
+
+    return workflow;
+  }
+  function editWorkflow(name: string, tags: string[], i: number) {
+    update((s) => {
+      if (s.workflows.list[i]) {
+        s.workflows.list[i].name = name
+        s.workflows.list[i].tags = tags
+      }
+
+      return s
+    })
+  }
+  function removeWorkflow(i: number, trashed: boolean) {
+    update((s) => {
+      const list = [...s.workflows.list];
+      const trash = [...s.workflows.trash];
+      if (trashed) {
+        trash.splice(i, 1);
+      } else {
+        trash[i] = list.splice(i, 1, null)[0];
+      }
+
+      const newSettings = {
+        ...s,
+        workflows: {
+          ...s.workflows,
+          list,
+          trash,
+        },
+      };
+      return newSettings;
+    });
+  }
+  function restoreWorkflow(i: number) {
+    update((s) => {
+      const list = [...s.workflows.list];
+      const trash = [...s.workflows.trash];
+      list[i] = trash.splice(i, 1, null)[0];
+
+      const newSettings = {
+        ...s,
+        workflows: {
+          ...s.workflows,
+          list,
+          trash,
+        },
+      };
+      return newSettings;
+    });
   }
 
   return {
@@ -128,7 +254,13 @@ export async function createSettingsStore(
     toggleExcludedGroup,
     toggleExcludedTag,
     toggleFavoriteGroup,
-    toggleFavoriteTag
+    toggleFavoriteTag,
+    toggleWorkflows,
+    selectWorkflow,
+    addWorkflow,
+    editWorkflow,
+    removeWorkflow,
+    restoreWorkflow
   };
 }
 
@@ -149,10 +281,13 @@ export interface TagMenuState {
   crossrefsSorted: { [group: string]: { [tag: string]: string[] } }
   allMatchingFiles: TFile[],
   selectedTags: string[],
-  expandedGroups: string[]
+  expandedGroups: string[],
+  workflows: {
+    selected: string,
+  }
 }
 
-function generateInitialTagMenuState(): TagMenuState {
+function generateInitialTagMenuState(): Omit<TagMenuState, 'workflows'> {
   return {
     allGroups: [],
     allTags: [],
@@ -162,7 +297,7 @@ function generateInitialTagMenuState(): TagMenuState {
     crossrefsSorted: {},
     allMatchingFiles: [],
     selectedTags: [],
-    expandedGroups: [""] // always expand ungrouped tags section
+    expandedGroups: [""], // always expand ungrouped tags section
   }
 }
 
@@ -171,12 +306,19 @@ export interface TagMenuStore extends Readable<TagMenuState> {
   toggleExpandedGroup(group: string): void
   destroy(): void
   loadState(selectedTags: string[], expandedGroups: string[]): void
+  selectWorkflow(key: string): void
 }
 
 export function createTagMenuStore(
-  settingsStore: SettingsStore
+  settingsStore: SettingsStore,
+  initialWorkflowIdOverride: string,
 ): TagMenuStore {
-  const { subscribe, set, update } = writable<TagMenuState>(generateInitialTagMenuState());
+  const { subscribe, update } = writable<TagMenuState>({
+    ...generateInitialTagMenuState(),
+    workflows: {
+      selected: initialWorkflowIdOverride
+    }
+  });
 
   function selectTags(selectTags: string[]) {
     const newState = generateInitialTagMenuState()
@@ -308,7 +450,10 @@ export function createTagMenuStore(
       })
     })
 
-    set(newState)
+    update((state) => ({
+      ...state,
+      ...newState,
+    }))
   }
 
   function toggleExpandedGroup(group: string) {
@@ -344,10 +489,27 @@ export function createTagMenuStore(
     }
   }
 
+  function selectWorkflow(w: string) {
+    update(state => ({
+      ...state,
+      workflows: {
+        ...state.workflows,
+        selected: w
+      }
+    }))
+  }
+
   const unsubscribe = settingsStore.subscribe(_ => {
     selectTags(get({ subscribe }).selectedTags)
   })
   const destroy = unsubscribe
 
-  return { subscribe, destroy, loadState, selectTags, toggleExpandedGroup }
+  return {
+    subscribe,
+    destroy,
+    loadState,
+    selectTags,
+    toggleExpandedGroup,
+    selectWorkflow
+  }
 }
