@@ -8,7 +8,7 @@ import { mount, unmount } from "svelte"
 export default class CRNView extends ItemView {
   private tagMenu: Record<string, unknown>
   private settingsStore: SettingsStore
-  private tagMenuStore: TagMenuStore
+  public tagMenuStore: TagMenuStore
   private unsubscribe: () => void
 
   constructor(leaf: WorkspaceLeaf, settingsStore: SettingsStore, tagMenuStore: TagMenuStore) {
@@ -27,6 +27,15 @@ export default class CRNView extends ItemView {
 
   getIcon(): string {
     return "go-to-file";
+  }
+
+  async setState(state: any, result: any): Promise<void> {
+    if (state && state.workflow) {
+      this.settingsStore.selectWorkflow(state.workflow);
+      this.tagMenuStore.selectWorkflow(state.workflow);
+    }
+
+    await super.setState(state, result);
   }
 
   getEphemeralState(): any {

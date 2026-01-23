@@ -1,3 +1,5 @@
+import { setIcon } from "obsidian";
+
 export function tagParts(tag: string): { tag: string, label?: string, title: string } {
   let temp = tag.slice()
 
@@ -22,3 +24,13 @@ export function tagParts(tag: string): { tag: string, label?: string, title: str
     }
   }
 }
+
+export const useIcon = (node: HTMLElement, iconId: string) => {
+  setIcon(node, iconId);
+
+  return {
+    update(newIconId: string) {
+      setIcon(node, newIconId);
+    },
+  };
+};
