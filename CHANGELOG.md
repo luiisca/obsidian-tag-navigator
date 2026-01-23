@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/luiisca/obsidian-tag-navigator/compare/v0.6.0...v0.6.1) (2026-01-23)
+
+
+### Bug Fixes
+
+* failing to render no match found message on PopoverSuggest ([ac3884b](https://github.com/luiisca/obsidian-tag-navigator/commit/ac3884bf14850101fd06df2d8c339f26bfe4da67))
+
 ## [0.6.0](https://github.com/luiisca/obsidian-tag-navigator/compare/v0.5.1...v0.6.0) (2026-01-23)
 
 
